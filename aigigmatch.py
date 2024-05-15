@@ -79,6 +79,7 @@ def ask_model(task_description):
         
         # Generate a prompt that asks the model to identify the best profile and explain why
         prompt = f"Given the task '{task_description}', review the following profiles and identify which one is the best fit and explain why. Consider their skills, experience, online status, and rating.\n\n"
+       
         for i, profile in enumerate(profiles, start=1):
             prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
             prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
@@ -90,7 +91,7 @@ def ask_model(task_description):
         # Process the response to extract the name and reasoning
         response_text = response.text.strip()
         # Assuming the response format is "The best fit is [Name] because [reason]."
-        if "because" in response_text:
+        if "why" in response_text:
             name_part, reason = response_text.split("because", 1)
             name = name_part.strip().split()[-1].strip()  # Gets the last word before 'because' which is the name
             return f"Top Profile: {name}\nReason: {reason.strip()}"
