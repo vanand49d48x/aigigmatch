@@ -28,14 +28,23 @@ model = genai.GenerativeModel(
     generation_config=generation_config,
 )
 
+#def get_database_connection():
+#    """Establish a connection to the database using environment variables."""
+#    return psycopg2.connect(
+#        dbname=os.getenv('DB_NAME'),
+#        user=os.getenv('DB_USER'),
+#        password=os.getenv('DB_PASSWORD'),
+#        host=os.getenv('DB_HOST')
+#    )
 def get_database_connection():
-    """Establish a connection to the database using environment variables."""
-    return psycopg2.connect(
-        dbname=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USER'),
-        password=os.getenv('DB_PASSWORD'),
-        host=os.getenv('DB_HOST')
-    )
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if database_url is None:
+            raise ValueError("DATABASE_URL is not set in environment variables.")
+        return psycopg2.connect(database_url)
+    except Exception as e:
+        print(f"Failed to connect to the database: {e}")
+        
 
 def fetch_profiles():
     """Fetch all worker profiles from the database."""
