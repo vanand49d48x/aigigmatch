@@ -92,5 +92,6 @@ iface = gr.Interface(
     description="Enter a task description to interact with the Google AI model."
 )
 
-# Run the interface
-iface.launch()
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 7860))  # Use Heroku's PORT environment variable or 7860 if local
+    iface.launch(port=port, share=True)  # Set share=True to create a public URL
