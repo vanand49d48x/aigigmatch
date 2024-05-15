@@ -52,7 +52,7 @@ def fetch_profiles():
     profiles = []
     try:
         with conn.cursor() as curs:
-            curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, availability FROM gig_workers")
+            curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online_status FROM gig_workers")
             for row in curs.fetchall():
                 # Check if the skills data is a string and convert it to a list if it is
                 if isinstance(row[2], str):
@@ -68,7 +68,7 @@ def fetch_profiles():
                     "Trust Score": row[4],
                     "Ninja Level": row[5],
                     "Task Experience": row[6],
-                    "Availability": row[7]
+                    "Online Status": row[7]
                 }
                 profiles.append(profile)
     finally:
@@ -80,10 +80,10 @@ def fetch_profiles():
 def ask_model(task_description):
     profiles = fetch_profiles()
     # Generate a prompt that includes all profiles and a task description
-    prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, availability, and rating.\n\n"
+    prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating.\n\n"
     for i, profile in enumerate(profiles, start=1):
         prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
-        prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Availability: {profile['Availability']}\n"
+        prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
     prompt += "\nList the profile names in order of best fit to least fit for the task."
 
     chat_session = model.start_chat(history=[])
