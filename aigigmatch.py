@@ -74,12 +74,12 @@ def fetch_profiles():
 def ask_model(task_description):
     try:
         profiles = fetch_profiles()
-        prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating.\n\n"
+        prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating. \n\n"
         for i, profile in enumerate(profiles, start=1):
             prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
             prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
-        prompt += "\nList the profile names in order of best fit to least fit for the task."
-
+        #prompt += "\nList the profile names in order of best fit to least fit for the task."
+        prompt +="\nList the top profile name with best match. Please respond in the format: 'The best fit is [Name] because [reason]"
         chat_session = model.start_chat(history=[])
         response = chat_session.send_message(prompt)
         return response.text
