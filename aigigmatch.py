@@ -102,12 +102,6 @@ iface = gr.Interface(
 )
 
 if __name__ == "__main__":
-    iface = gr.Interface(
-        fn=ask_model,
-        inputs=gr.Textbox(label="Enter your task description"),
-        outputs=gr.Textbox(label="Model Response"),
-        title="Google Generative AI Chat Model",
-        description="Enter a task description to interact with the Google AI model."
-    )
-    iface.launch(server_name="0.0.0.0", server_port=os.environ.get("PORT", 7860), share=True)
+    port = int(os.environ.get("PORT", 7860))  # Ensuring the port is an integer
+    iface.launch(server_name="0.0.0.0", server_port=port, share=True)
 
