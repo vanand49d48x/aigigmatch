@@ -93,5 +93,7 @@ iface = gr.Interface(
 )
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 7860))  # Use Heroku's PORT environment variable or 7860 if local
-    iface.launch(port=port, share=True)  # Set share=True to create a public URL
+    import uvicorn
+    port = int(os.environ.get("PORT", 7860))  # Heroku assigns a port dynamically
+    iface.launch(share=True)
+    uvicorn.run(iface.app, host="0.0.0.0", port=port)
