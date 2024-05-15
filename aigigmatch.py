@@ -74,29 +74,15 @@ def fetch_profiles():
 def ask_model(task_description):
     try:
         profiles = fetch_profiles()
-        if not profiles:  # Check if the profile list is empty
-            return "No Matches Found"
-        
-        # Generate a prompt that asks the model to identify the best profile and explain why
-        prompt = f"Given the task '{task_description}', review the following profiles and identify which one is the best fit and explain why. Consider their skills, experience, online status, and rating.\n\n"
-       
+        prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating.\n\n"
         for i, profile in enumerate(profiles, start=1):
             prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
             prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
-        prompt += "\nProvide the name of the best fit and the reasons for your choice."
+        prompt += "\nList the profile names in order of best fit to least fit for the task."
 
         chat_session = model.start_chat(history=[])
         response = chat_session.send_message(prompt)
-        
-        # Process the response to extract the name and reasoning
-        response_text = response.text.strip()
-        # Assuming the response format is "The best fit is [Name] because [reason]."
-        if "why" in response_text:
-            name_part, reason = response_text.split("because", 1)
-            name = name_part.strip().split()[-1].strip()  # Gets the last word before 'because' which is the name
-            return f"Top Profile: {name}\nReason: {reason.strip()}"
-        else:
-            return "No clear match was found."
+        return response.text
     except Exception as e:
         logging.error(f"Error during model interaction: {e}")
         return f"An error occurred: {e}"
