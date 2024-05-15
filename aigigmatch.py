@@ -3,6 +3,10 @@ import gradio as gr
 import google.generativeai as genai
 import psycopg2
 import json
+import logging
+
+# Set up basic configuration for logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Configure the Google AI model
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
@@ -28,14 +32,6 @@ model = genai.GenerativeModel(
     generation_config=generation_config,
 )
 
-#def get_database_connection():
-#    """Establish a connection to the database using environment variables."""
-#    return psycopg2.connect(
-#        dbname=os.getenv('DB_NAME'),
-#        user=os.getenv('DB_USER'),
-#        password=os.getenv('DB_PASSWORD'),
-#        host=os.getenv('DB_HOST')
-#    )
 def get_database_connection():
     try:
         database_url = os.getenv("DATABASE_URL")
@@ -43,23 +39,21 @@ def get_database_connection():
             raise ValueError("DATABASE_URL is not set in environment variables.")
         return psycopg2.connect(database_url)
     except Exception as e:
-        print(f"Failed to connect to the database: {e}")
-        
+        logging.error(f"Failed to connect to the database: {e}")
+        raise
 
 def fetch_profiles():
-    """Fetch all worker profiles from the database."""
     conn = get_database_connection()
     profiles = []
     try:
         with conn.cursor() as curs:
             curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online_status FROM gig_workers")
             for row in curs.fetchall():
-                # Check if the skills data is a string and convert it to a list if it is
-                if isinstance(row[2], str):
-                    skills = json.loads(row[2])
-                else:
-                    skills = row[2]  # Assuming it's already a list
-                #printf(row[0])
+                try:
+                    skills = json.loads(row[2]) if isinstance(row[2], str) else row[2]
+                except json.JSONDecodeError as e:
+                    logging.error(f"Error decoding JSON for skills data: {e}")
+                    skills = []
                 profile = {
                     "Name": row[0],
                     "About": row[1],
@@ -71,26 +65,27 @@ def fetch_profiles():
                     "Online Status": row[7]
                 }
                 profiles.append(profile)
+    except Exception as e:
+        logging.error(f"Error fetching profiles: {e}")
     finally:
         conn.close()
     return profiles
 
-
-
 def ask_model(task_description):
-    profiles = fetch_profiles()
-    # Generate a prompt that includes all profiles and a task description
-    prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating.\n\n"
-    for i, profile in enumerate(profiles, start=1):
-        prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
-        prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
-    prompt += "\nList the profile names in order of best fit to least fit for the task."
+    try:
+        profiles = fetch_profiles()
+        prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating.\n\n"
+        for i, profile in enumerate(profiles, start=1):
+            prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
+            prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
+        prompt += "\nList the profile names in order of best fit to least fit for the task."
 
-    chat_session = model.start_chat(history=[])
-    response = chat_session.send_message(prompt)
-    return response.text
-
-
+        chat_session = model.start_chat(history=[])
+        response = chat_session.send_message(prompt)
+        return response.text
+    except Exception as e:
+        logging.error(f"Error during model interaction: {e}")
+        return f"An error occurred: {e}"
 
 # Create Gradio interface
 iface = gr.Interface(
@@ -104,4 +99,3 @@ iface = gr.Interface(
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))  # Ensuring the port is an integer
     iface.launch(server_name="0.0.0.0", server_port=port, share=True)
-
