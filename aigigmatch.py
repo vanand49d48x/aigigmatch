@@ -6,7 +6,7 @@ import json
 import logging
 
 # Set up basic configuration for logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname=s - %(message)s')
 
 # Configure the Google AI model
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
@@ -64,7 +64,7 @@ def fetch_profiles():
     conn.close()
     return profiles
 
-def ask_model(task_description, history=None):
+def ask_model(task_description, additional_info="", history=None):
     if history is None:
         history = []
 
@@ -79,28 +79,31 @@ def ask_model(task_description, history=None):
                        f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
         prompt += "\nPlease provide the top profile name with the best match, or request more information if necessary."
 
+        if additional_info:
+            task_description += " " + additional_info
+
         response = chat_session.send_message(prompt)
         history.append({"prompt": prompt, "response": response.text})
 
         if "need more information" not in response.text.lower():
             break
 
-        task_description = yield response.text  # Yield the response and wait for additional information from the user
-
     return response.text, history
 
-def gradio_interface(task_description, additional_info="", history=None):
+def gradio_interface(task_description, additional_info, history):
     if history is None:
         history = []
     if additional_info:
         task_description += " " + additional_info
 
-    response, history = ask_model(task_description, history)
+    response, history = ask_model(task_description, additional_info, history)
+    if "need more information" in response.lower():
+        return response + "\n\nPlease provide additional information.", history
     return response, history
 
 iface = gr.Interface(
     fn=gradio_interface,
-    inputs=[gr.Textbox(label="Enter your task description"), gr.Textbox(label="Additional information (optional)"), gr.JSON(label="History", default="[]")],
+    inputs=[gr.Textbox(label="Enter your task description"), gr.Textbox(label="Additional information (optional)"), gr.JSON(label="History")],
     outputs=[gr.Textbox(label="Model Response"), gr.JSON(label="Updated History")],
     title="Interactive AI for Gig Worker Matching",
     description="Enter a task description and interact with the AI. Provide additional details if prompted by the AI for more information."
