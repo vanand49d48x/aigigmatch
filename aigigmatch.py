@@ -75,51 +75,45 @@ def fetch_profiles():
         conn.close()
     return profiles
 
-def ask_model(task_description, session_id):
+def ask_model(task_description, session_id, history=[]):
     profiles = fetch_profiles()
-    if session_id not in chat_sessions:
-        chat_sessions[session_id] = model.start_chat(history=[])
-
-    chat_session = chat_sessions[session_id]
-    prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', " 
-              "evaluate their fit. Consider their skills, experience, online status, and rating. If the task description " 
-              "is unclear or more details are needed for a precise match, please clearly state 'Need more information' and " 
-              "ask specific questions to clarify. \n\nProfiles:\n")
-
+    if not history:  # If history is empty, start a new session
+        history = []
+    
+    prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
+              "evaluate their fit. Consider their skills, experience, online status, and rating. \n\nProfiles:\n")
     for i, profile in enumerate(profiles, start=1):
         prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
                    f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
     prompt += "\nList the top profile name with the best match. If unsure, state 'Need more information' followed by your questions."
-
-    response = chat_session.send_message(prompt)
-    if "need more information" in response.text.lower():
-        output_text = f"{response.text}\n\nPlease provide more information on the task below and resubmit:"
-    else:
-        return response.text
-
-    return output_text
-
-
-def gradio_interface(task_description):
-    session_id = gr.get_state("session_id")
-    if not session_id:
-        session_id = str(uuid.uuid4())
-        gr.set_state(session_id=session_id)
     
-    return ask_model(task_description, session_id)
+    chat_session = model.start_chat(history=history)
+    response = chat_session.send_message(prompt)
+    
+    new_history = history + [prompt, response.text]  # Update history with current interaction
+    return response.text, new_history
+
+
+def gradio_interface(task_description, history=[]):
+    session_id = str(uuid.uuid4())  # Generating a new session ID for each user interaction
+    response_text, updated_history = ask_model(task_description, session_id, history)
+    return response_text, updated_history
+
+css = """
+body { font-family: Arial, sans-serif; }
+label { font-weight: bold; color: #303F9F; }
+textarea { font-family: Courier, monospace; }
+"""
+
 
 iface = gr.Interface(
     fn=gradio_interface,
-    inputs=gr.Textbox(label="Enter your task description or additional information here"),
-    outputs=gr.Textbox(label="Model Response"),
+    inputs=[gr.Textbox(label="Enter your task description"), gr.JSON(label="History", default=[])],
+    outputs=[gr.Textbox(label="Model Response"), gr.JSON(label="Updated History")],
     title="AI Gig Worker Matcher",
     description="Describe the task you need help with, and let the AI recommend the best gig worker for you. If the AI asks for more information, please provide it in the same input box.",
     theme="huggingface",
-    css="""
-        body { font-family: Arial, sans-serif; }
-        label { font-weight: bold; color: #303F9F; }
-        textarea { font-family: Courier, monospace; }
-    """
+    css=css
 )
 
 if __name__ == "__main__":
