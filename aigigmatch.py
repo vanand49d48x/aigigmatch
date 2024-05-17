@@ -74,10 +74,10 @@ def fetch_profiles():
 def ask_model(task_description):
     try:
         profiles = fetch_profiles()
-        prompt = f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
+        prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
           "evaluate their fit. Consider their skills, experience, online status, and rating. If the task description "
           "is unclear or more details are needed for a precise match, please ask specific questions to clarify. \n\n"
-          "Profiles: \n\n"
+          "Profiles:\n")
         for i, profile in enumerate(profiles, start=1):
             prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
             prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
