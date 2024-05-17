@@ -94,8 +94,9 @@ def ask_model(task_description, session_id, history=[]):
     return response.text, new_history
 
 
-def gradio_interface(task_description, history=[]):
-    session_id = str(uuid.uuid4())  # Generating a new session ID for each user interaction
+def gradio_interface(task_description, history=None):
+    history = history or []
+    session_id = str(uuid.uuid4())  
     response_text, updated_history = ask_model(task_description, session_id, history)
     return response_text, updated_history
 
@@ -108,13 +109,20 @@ textarea { font-family: Courier, monospace; }
 
 iface = gr.Interface(
     fn=gradio_interface,
-    inputs=[gr.Textbox(label="Enter your task description"), gr.JSON(label="History", default=[])],
-    outputs=[gr.Textbox(label="Model Response"), gr.JSON(label="Updated History")],
+    inputs=[
+        gr.Textbox(label="Enter your task description"),
+        gr.JSON(label="History", optional=True)  # Optional JSON input for history
+    ],
+    outputs=[
+        gr.Textbox(label="Model Response"),
+        gr.JSON(label="Updated History")
+    ],
     title="AI Gig Worker Matcher",
     description="Describe the task you need help with, and let the AI recommend the best gig worker for you. If the AI asks for more information, please provide it in the same input box.",
     theme="huggingface",
     css=css
 )
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))  # Ensuring the port is an integer
