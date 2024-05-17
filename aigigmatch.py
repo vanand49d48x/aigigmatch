@@ -76,17 +76,18 @@ def ask_model(task_description):
         profiles = fetch_profiles()
         prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
                   "evaluate their fit. Consider their skills, experience, online status, and rating. If the task description "
-                  "is unclear or more details are needed for a precise match, please ask specific questions to clarify. \n\n"
-                  "Profiles:\n")
+                  "is unclear or more details are needed for a precise match, please clearly state 'Need more information' and "
+                  "ask specific questions to clarify. \n\nProfiles:\n")
         for i, profile in enumerate(profiles, start=1):
             prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
                        f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
-        prompt += "\nList the top profile name with the best match. Please respond in the format: 'The best fit is [Name] because [reason].'"
+        prompt += "\nList the top profile name with the best match. If unsure, state 'Need more information' followed by your questions."
 
         chat_session = model.start_chat(history=[])
         response = chat_session.send_message(prompt)
 
-        needs_clarification = "can you specify" in response.text.lower() or "could you clarify" in response.text.lower()
+        # Here, we check if AI specifically states needing more information
+        needs_clarification = "need more information" in response.text.lower()
         return response.text, needs_clarification
     except Exception as e:
         logging.error(f"Error during model interaction: {e}")
