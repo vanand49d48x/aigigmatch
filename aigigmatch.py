@@ -75,26 +75,22 @@ def ask_model(task_description):
     try:
         profiles = fetch_profiles()
         prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
-          "evaluate their fit. Consider their skills, experience, online status, and rating. If the task description "
-          "is unclear or more details are needed for a precise match, please ask specific questions to clarify. \n\n"
-          "Profiles:\n")
+                  "evaluate their fit. Consider their skills, experience, online status, and rating. If the task description "
+                  "is unclear or more details are needed for a precise match, please ask specific questions to clarify. \n\n"
+                  "Profiles:\n")
         for i, profile in enumerate(profiles, start=1):
-            prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
-            prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
+            prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
+                       f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
         prompt += "\nList the top profile name with the best match. Please respond in the format: 'The best fit is [Name] because [reason].'"
 
         chat_session = model.start_chat(history=[])
         response = chat_session.send_message(prompt)
-        # Loop to handle interactive questions if the task is not clear
-        while "can you specify" in response.text.lower() or "could you clarify" in response.text.lower():
-            follow_up_question = response.text
-            task_description = gr.Interface.ask(question=follow_up_question)
-            response = chat_session.send_message(task_description)
 
-        return response.text
+        needs_clarification = "can you specify" in response.text.lower() or "could you clarify" in response.text.lower()
+        return response.text, needs_clarification
     except Exception as e:
         logging.error(f"Error during model interaction: {e}")
-        return f"An error occurred: {e}"
+        return f"An error occurred: {e}", False
 
 # Create Gradio interface
 css = """
@@ -106,10 +102,10 @@ textarea { font-family: Courier, monospace; }
 iface = gr.Interface(
     fn=ask_model,
     inputs=gr.Textbox(label="Enter your task description"),
-    outputs=gr.Textbox(label="Model Response"),
+    outputs=[gr.Textbox(label="Model Response"), gr.Label(label="Need More Information?")],
     title="AI Gig Worker Matcher",
     description="Describe the task you need help with, and let the AI recommend the best gig worker for you.",
-    theme="huggingface",  # Using a predefined theme
+    theme="huggingface",
     css=css
 )
 
