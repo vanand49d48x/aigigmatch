@@ -88,7 +88,8 @@ def ask_model(task_description):
 
         # Check if AI is asking for more information and customize the output message
         if "need more information" in response.text.lower():
-            return f"{response.text}\n\nPlease provide more information on the task:"
+            output_text = (f"{response.text}\n\nPlease provide more information on the task below and resubmit:")
+            return output_text
         else:
             return response.text
     except Exception as e:
@@ -104,10 +105,10 @@ textarea { font-family: Courier, monospace; }
 
 iface = gr.Interface(
     fn=ask_model,
-    inputs=gr.Textbox(label="Enter your task description"),
+    inputs=gr.Textbox(label="Enter your task description or additional information here"),
     outputs=gr.Textbox(label="Model Response"),
     title="AI Gig Worker Matcher",
-    description="Describe the task you need help with, and let the AI recommend the best gig worker for you.",
+    description="Describe the task you need help with, and let the AI recommend the best gig worker for you. If the AI asks for more information, please provide it in the same input box.",
     theme="huggingface",
     css=css
 )
