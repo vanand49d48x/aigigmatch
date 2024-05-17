@@ -64,10 +64,13 @@ def fetch_profiles():
     conn.close()
     return profiles
 
-def ask_model(task_description, history=[]):
+def ask_model(task_description, history=None):
+    if history is None:
+        history = []
+
     profiles = fetch_profiles()
     chat_session = model.start_chat(history=history)
-    
+
     while True:
         prompt = (f"Based on the task description '{task_description}', evaluate the suitability of the following gig worker profiles. "
                   "If the information provided is insufficient, please specify what additional information is needed. \n\nProfiles:\n")
@@ -81,11 +84,12 @@ def ask_model(task_description, history=[]):
 
         if "need more information" not in response.text.lower():
             break
+
         task_description = yield response.text  # Yield the response and wait for additional information from the user
 
     return response.text, history
 
-def gradio_interface(task_description, additional_info="", history=[]):
+def gradio_interface(task_description, additional_info="", history=None):
     if additional_info:
         task_description += " " + additional_info
     response, history = ask_model(task_description, history)
