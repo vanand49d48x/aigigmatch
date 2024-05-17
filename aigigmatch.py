@@ -47,7 +47,7 @@ def fetch_profiles():
     conn = get_database_connection()
     profiles = []
     with conn.cursor() as curs:
-        curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online status FROM gig_workers")
+        curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online_status FROM gig_workers")
         for row in curs.fetchall():
             skills = json.loads(row[2]) if isinstance(row[2], str) else row[2]
             profile = {
