@@ -6,7 +6,7 @@ import json
 import logging
 
 # Set up basic configuration for logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname=s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Configure the Google AI model
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
@@ -64,6 +64,7 @@ def fetch_profiles():
     conn.close()
     return profiles
 
+
 def ask_model(task_description, additional_info="", history=None):
     if history is None:
         history = []
@@ -72,43 +73,71 @@ def ask_model(task_description, additional_info="", history=None):
     chat_session = model.start_chat(history=history)
 
     while True:
-        prompt = (f"Based on the task description '{task_description}', evaluate the suitability of the following gig worker profiles. "
-                  "If the information provided is insufficient, please specify what additional information is needed. \n\nProfiles:\n")
-        for i, profile in enumerate(profiles, start=1):
-            prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
-                       f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
-        prompt += "\nPlease provide the top profile name with the best match, or request more information if necessary."
-
-        if additional_info:
-            task_description += " " + additional_info
+        prompt = (f"Based on the task description '{task_description}', what additional information do you need to better understand the task requirements? "
+                  "If you have enough information, please provide a complete task description.")
 
         response = chat_session.send_message(prompt)
         history.append({"prompt": prompt, "response": response.text})
 
-        if "need more information" not in response.text.lower():
-            break
+        if "complete task description" in response.text.lower():
+            return None, response.text, history
 
-    return response.text, history
+        return response.text, None, history
 
-def gradio_interface(task_description, additional_info, history):
-    if history is None:
-        history = []
-    if additional_info:
-        task_description += " " + additional_info
+def find_best_profile(task_description):
+    profiles = fetch_profiles()
+    chat_session = model.start_chat()
 
-    response, history = ask_model(task_description, additional_info, history)
-    if "need more information" in response.lower():
-        return response + "\n\nPlease provide additional information.", history
-    return response, history
+    prompt = (f"Based on the complete task description '{task_description}', evaluate the suitability of the following gig worker profiles "
+              "and provide the name of the best-matched profile.\n\nProfiles:\n")
+    for i, profile in enumerate(profiles, start=1):
+        prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
+                   f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
 
-iface = gr.Interface(
-    fn=gradio_interface,
-    inputs=[gr.Textbox(label="Enter your task description"), gr.Textbox(label="Additional information (optional)"), gr.JSON(label="History")],
-    outputs=[gr.Textbox(label="Model Response"), gr.JSON(label="Updated History")],
-    title="Interactive AI for Gig Worker Matching",
-    description="Enter a task description and interact with the AI. Provide additional details if prompted by the AI for more information."
-)
+    response = chat_session.send_message(prompt)
+    return response.text
+
+def gradio_interface():
+    with gr.Blocks(title="Interactive AI for Gig Worker Matching", css=".gradio-container {background-color: #f4f4f4}") as iface:
+        gr.Markdown("Enter a task description and interact with the AI. Provide additional details if prompted by the AI for more information.")
+        
+        with gr.Row():
+            task_description = gr.Textbox(label="Enter your task description")
+            additional_info = gr.Textbox(label="Additional Information", visible=False)
+        
+        with gr.Row():
+            model_question = gr.Textbox(label="Model Question", visible=False)
+            refined_task_description = gr.Textbox(label="Refined Task Description", visible=False)
+        
+        find_button = gr.Button(value="Find", visible=False)
+        best_matched_profile = gr.Textbox(label="Best Matched Profile", visible=False)
+        
+        history = gr.JSON(label="History", visible=False)
+        
+        def process_task(task_description, additional_info, history):
+            if history is None:
+                history = []
+            
+            if additional_info:
+                task_description += " " + additional_info
+            
+            question, complete_task_description, history = ask_model(task_description, history=history)
+            
+            if question:
+                return gr.update(value=question), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), history
+            else:
+                return gr.update(visible=False), gr.update(visible=False), gr.update(value=complete_task_description, visible=True), gr.update(visible=True), history
+        
+        def find_best_profile_event(complete_task_description):
+            best_profile = find_best_profile(complete_task_description)
+            return gr.update(value=best_profile, visible=True)
+        
+        task_description.submit(process_task, [task_description, additional_info, history], [model_question, additional_info, refined_task_description, find_button, history])
+        additional_info.submit(process_task, [task_description, additional_info, history], [model_question, additional_info, refined_task_description, find_button, history])
+        find_button.click(find_best_profile_event, inputs=refined_task_description, outputs=best_matched_profile)
+    
+    iface.launch(server_name="0.0.0.0", server_port=port, share=True)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
-    iface.launch(server_name="0.0.0.0", server_port=port, share=True)
+    gradio_interface()
