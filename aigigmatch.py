@@ -86,12 +86,14 @@ def ask_model(task_description):
         chat_session = model.start_chat(history=[])
         response = chat_session.send_message(prompt)
 
-        # Here, we check if AI specifically states needing more information
-        needs_clarification = "need more information" in response.text.lower()
-        return response.text, needs_clarification
+        # Check if AI is asking for more information and customize the output message
+        if "need more information" in response.text.lower():
+            return f"{response.text}\n\nPlease provide more information on the task:"
+        else:
+            return response.text
     except Exception as e:
         logging.error(f"Error during model interaction: {e}")
-        return f"An error occurred: {e}", False
+        return f"An error occurred: {e}"
 
 # Create Gradio interface
 css = """
@@ -103,7 +105,7 @@ textarea { font-family: Courier, monospace; }
 iface = gr.Interface(
     fn=ask_model,
     inputs=gr.Textbox(label="Enter your task description"),
-    outputs=[gr.Textbox(label="Model Response"), gr.Label(label="Need More Information?")],
+    outputs=gr.Textbox(label="Model Response"),
     title="AI Gig Worker Matcher",
     description="Describe the task you need help with, and let the AI recommend the best gig worker for you.",
     theme="huggingface",
