@@ -78,24 +78,36 @@ def ask_model(task_description):
         for i, profile in enumerate(profiles, start=1):
             prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
             prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
-        #prompt += "\nList the profile names in order of best fit to least fit for the task."
-        prompt +="\nList the top profile name with best match. Please respond in the format: 'The best fit is [Name] because [reason]"
+        prompt += "\nList the top profile name with the best match. Please respond in the format: 'The best fit is [Name] because [reason].'"
+
         chat_session = model.start_chat(history=[])
         response = chat_session.send_message(prompt)
+        # Loop to handle interactive questions if the task is not clear
+        while "can you specify" in response.text.lower() or "could you clarify" in response.text.lower():
+            follow_up_question = response.text
+            task_description = gr.Interface.ask(question=follow_up_question)
+            response = chat_session.send_message(task_description)
+
         return response.text
     except Exception as e:
         logging.error(f"Error during model interaction: {e}")
         return f"An error occurred: {e}"
 
-
-
 # Create Gradio interface
+css = """
+body { font-family: Arial, sans-serif; }
+label { font-weight: bold; color: #303F9F; }
+textarea { font-family: Courier, monospace; }
+"""
+
 iface = gr.Interface(
     fn=ask_model,
     inputs=gr.Textbox(label="Enter your task description"),
     outputs=gr.Textbox(label="Model Response"),
-    title="Google Generative AI Chat Model",
-    description="Enter a task description to interact with the Google AI model."
+    title="AI Gig Worker Matcher",
+    description="Describe the task you need help with, and let the AI recommend the best gig worker for you.",
+    theme="huggingface",  # Using a predefined theme
+    css=css
 )
 
 if __name__ == "__main__":
