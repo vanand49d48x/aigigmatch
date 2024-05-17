@@ -4,7 +4,6 @@ import google.generativeai as genai
 import psycopg2
 import json
 import logging
-import uuid
 
 # Set up basic configuration for logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -32,9 +31,6 @@ model = genai.GenerativeModel(
     safety_settings=safety_settings,
     generation_config=generation_config,
 )
-
-# Dictionary to hold chat sessions
-chat_sessions = {}
 
 def get_database_connection():
     try:
@@ -75,54 +71,32 @@ def fetch_profiles():
         conn.close()
     return profiles
 
-def ask_model(task_description, session_id, history=[]):
-    profiles = fetch_profiles()
-    if not history:  # If history is empty, start a new session
-        history = []
-    
-    prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
-              "evaluate their fit. Consider their skills, experience, online status, and rating. \n\nProfiles:\n")
-    for i, profile in enumerate(profiles, start=1):
-        prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
-                   f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
-    prompt += "\nList the top profile name with the best match. If unsure, state 'Need more information' followed by your questions."
-    
-    chat_session = model.start_chat(history=history)
-    response = chat_session.send_message(prompt)
-    
-    new_history = history + [prompt, response.text]  # Update history with current interaction
-    return response.text, new_history
+def ask_model(task_description):
+    try:
+        profiles = fetch_profiles()
+        prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating. \n\n"
+        for i, profile in enumerate(profiles, start=1):
+            prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
+            prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
+        #prompt += "\nList the profile names in order of best fit to least fit for the task."
+        prompt +="\nList the top profile name with best match. Please respond in the format: 'The best fit is [Name] because [reason]"
+        chat_session = model.start_chat(history=[])
+        response = chat_session.send_message(prompt)
+        return response.text
+    except Exception as e:
+        logging.error(f"Error during model interaction: {e}")
+        return f"An error occurred: {e}"
 
 
-def gradio_interface(task_description, history=None):
-    history = history or []
-    session_id = str(uuid.uuid4())  
-    response_text, updated_history = ask_model(task_description, session_id, history)
-    return response_text, updated_history
 
-css = """
-body { font-family: Arial, sans-serif; }
-label { font-weight: bold; color: #303F9F; }
-textarea { font-family: Courier, monospace; }
-"""
-
-
+# Create Gradio interface
 iface = gr.Interface(
-    fn=gradio_interface,
-    inputs=[
-        gr.Textbox(label="Enter your task description"),
-        gr.JSON(label="History", optional=True)  # Optional JSON input for history
-    ],
-    outputs=[
-        gr.Textbox(label="Model Response"),
-        gr.JSON(label="Updated History")
-    ],
-    title="AI Gig Worker Matcher",
-    description="Describe the task you need help with, and let the AI recommend the best gig worker for you. If the AI asks for more information, please provide it in the same input box.",
-    theme="huggingface",
-    css=css
+    fn=ask_model,
+    inputs=gr.Textbox(label="Enter your task description"),
+    outputs=gr.Textbox(label="Model Response"),
+    title="Google Generative AI Chat Model",
+    description="Enter a task description to interact with the Google AI model."
 )
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))  # Ensuring the port is an integer
