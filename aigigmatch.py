@@ -33,10 +33,11 @@ model = genai.GenerativeModel(
 )
 
 def get_database_connection():
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        logging.error("DATABASE_URL is not set in environment variables.")
+        raise ValueError("DATABASE_URL is not set in environment variables.")
     try:
-        database_url = os.getenv("DATABASE_URL")
-        if database_url is None:
-            raise ValueError("DATABASE_URL is not set in environment variables.")
         return psycopg2.connect(database_url)
     except Exception as e:
         logging.error(f"Failed to connect to the database: {e}")
@@ -45,31 +46,25 @@ def get_database_connection():
 def fetch_profiles():
     conn = get_database_connection()
     profiles = []
-    try:
-        with conn.cursor() as curs:
-            curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online status FROM gig_workers")
-            for row in curs.fetchall():
-                try:
-                    skills = json.loads(row[2]) if isinstance(row[2], str) else row[2]
-                except json.JSONDecodeError as e:
-                    logging.error(f"Error decoding JSON for skills data: {e}")
-                    skills = []
-                profile = {
-                    "Name": row[0],
-                    "About": row[1],
-                    "Skills": skills,
-                    "Rating": row[3],
-                    "Trust Score": row[4],
-                    "Ninja Level": row[5],
-                    "Task Experience": row[6],
-                    "Online Status": row[7]
-                }
-                profiles.append(profile)
-    finally:
-        conn.close()
+    with conn.cursor() as curs:
+        curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online_status FROM gig_workers")
+        for row in curs.fetchall():
+            skills = json.loads(row[2]) if isinstance(row[2], str) else row[2]
+            profile = {
+                "Name": row[0],
+                "About": row[1],
+                "Skills": skills,
+                "Rating": row[3],
+                "Trust Score": row[4],
+                "Ninja Level": row[5],
+                "Task Experience": row[6],
+                "Online Status": row[7]
+            }
+            profiles.append(profile)
+    conn.close()
     return profiles
 
-def ask_model(task_description, history=[]):
+def ask_model(task_description):
     profiles = fetch_profiles()
     prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
               "evaluate their fit. Consider their skills, experience, online status, and rating. "
@@ -79,30 +74,14 @@ def ask_model(task_description, history=[]):
                    f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
     prompt += "\nList the top profile name with best match. If unclear, respond with 'Need more information' and specify what is needed."
 
-    # Manage conversation history
-    if history:
-        chat_session = model.start_chat(history=history)
-    else:
-        chat_session = model.start_chat(history=[])
+    chat_session = model.start_chat(history=[])
     response = chat_session.send_message(prompt)
-    history.append(prompt)
-    history.append(response.text)
+    return response.text
 
-    # Check if AI asked for more information
-    while "need more information" in response.text.lower():
-        # Simulate asking for more information
-        additional_info = input("AI needs more information: ")  # This would be replaced by UI element in a real application
-        response = chat_session.send_message(additional_info)
-        history.append(additional_info)
-        history.append(response.text)
-
-    return response.text, history
-
-# Create Gradio interface
 iface = gr.Interface(
     fn=ask_model,
-    inputs=[gr.Textbox(label="Enter your task description"), gr.JSON(label="History", default="[]")],
-    outputs=[gr.Textbox(label="Model Response"), gr.JSON(label="Updated History")],
+    inputs=gr.Textbox(label="Enter your task description"),
+    outputs=gr.Textbox(label="Model Response"),
     title="Google Generative AI Chat Model",
     description="Enter a task description to interact with the Google AI model. If more details are needed, the AI will clearly ask for them."
 )
