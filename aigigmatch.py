@@ -47,7 +47,7 @@ def fetch_profiles():
     conn = get_database_connection()
     profiles = []
     with conn.cursor() as curs:
-        curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online_status FROM gig_workers")
+        curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online status FROM gig_workers")
         for row in curs.fetchall():
             skills = json.loads(row[2]) if isinstance(row[2], str) else row[2]
             profile = {
@@ -66,16 +66,21 @@ def fetch_profiles():
 
 def ask_model(task_description):
     profiles = fetch_profiles()
-    prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
-              "evaluate their fit. Consider their skills, experience, online status, and rating. "
-              "If the description is insufficient, please respond with 'Need more information' followed by specific questions. \n\nProfiles:\n")
+    prompt = (f"Based on the provided task description, evaluate the suitability of the following gig worker profiles. "
+              "If the information provided is insufficient to make a decision, specify what additional information is needed. \n\n"
+              f"Task Description: '{task_description}'\n\nProfiles:\n")
     for i, profile in enumerate(profiles, start=1):
         prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
                    f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
-    prompt += "\nList the top profile name with best match. If unclear, respond with 'Need more information' and specify what is needed."
-
+    
     chat_session = model.start_chat(history=[])
     response = chat_session.send_message(prompt)
+
+    while "need more information" in response.text.lower():
+        # Use a Gradio input to get additional information from the user
+        additional_info = gr.inputs.Textbox.update("AI needs more information to proceed. Please provide more details about the task.")
+        response = chat_session.send_message(additional_info)
+
     return response.text
 
 iface = gr.Interface(
@@ -83,7 +88,7 @@ iface = gr.Interface(
     inputs=gr.Textbox(label="Enter your task description"),
     outputs=gr.Textbox(label="Model Response"),
     title="Google Generative AI Chat Model",
-    description="Enter a task description to interact with the Google AI model. If more details are needed, the AI will clearly ask for them."
+    description="Enter a task description to interact with the Google AI model. If more details are needed, the AI will ask for them interactively."
 )
 
 if __name__ == "__main__":
