@@ -47,7 +47,7 @@ def fetch_profiles():
     profiles = []
     try:
         with conn.cursor() as curs:
-            curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online_status FROM gig_workers")
+            curs.execute("SELECT name, about, skills, rating, trust_score, ninja_level, task_experience, online status FROM gig_workers")
             for row in curs.fetchall():
                 try:
                     skills = json.loads(row[2]) if isinstance(row[2], str) else row[2]
@@ -65,39 +65,48 @@ def fetch_profiles():
                     "Online Status": row[7]
                 }
                 profiles.append(profile)
-    except Exception as e:
-        logging.error(f"Error fetching profiles: {e}")
     finally:
         conn.close()
     return profiles
 
-def ask_model(task_description):
-    try:
-        profiles = fetch_profiles()
-        prompt = f"Rank the following profiles based on their suitability for the task: '{task_description}'. Consider their skills, experience, online status, and rating. \n\n"
-        for i, profile in enumerate(profiles, start=1):
-            prompt += f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
-            prompt += f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n"
-        #prompt += "\nList the profile names in order of best fit to least fit for the task."
-        prompt +="\nList the top profile name with best match. Please respond in the format: 'The best fit is [Name] because [reason]"
+def ask_model(task_description, history=[]):
+    profiles = fetch_profiles()
+    prompt = (f"Here are the profiles of gig workers. Based on the task description '{task_description}', "
+              "evaluate their fit. Consider their skills, experience, online status, and rating. "
+              "If the description is insufficient, please respond with 'Need more information' followed by specific questions. \n\nProfiles:\n")
+    for i, profile in enumerate(profiles, start=1):
+        prompt += (f"{i}. Name: {profile['Name']}, Skills: {', '.join(profile['Skills'])}, Experience: {profile['Task Experience']} hours, "
+                   f"Rating: {profile['Rating']}, Trust Score: {profile['Trust Score']}, Online Status: {profile['Online Status']}\n")
+    prompt += "\nList the top profile name with best match. If unclear, respond with 'Need more information' and specify what is needed."
+
+    # Manage conversation history
+    if history:
+        chat_session = model.start_chat(history=history)
+    else:
         chat_session = model.start_chat(history=[])
-        response = chat_session.send_message(prompt)
-        return response.text
-    except Exception as e:
-        logging.error(f"Error during model interaction: {e}")
-        return f"An error occurred: {e}"
+    response = chat_session.send_message(prompt)
+    history.append(prompt)
+    history.append(response.text)
 
+    # Check if AI asked for more information
+    while "need more information" in response.text.lower():
+        # Simulate asking for more information
+        additional_info = input("AI needs more information: ")  # This would be replaced by UI element in a real application
+        response = chat_session.send_message(additional_info)
+        history.append(additional_info)
+        history.append(response.text)
 
+    return response.text, history
 
 # Create Gradio interface
 iface = gr.Interface(
     fn=ask_model,
-    inputs=gr.Textbox(label="Enter your task description"),
-    outputs=gr.Textbox(label="Model Response"),
+    inputs=[gr.Textbox(label="Enter your task description"), gr.JSON(label="History", default="[]")],
+    outputs=[gr.Textbox(label="Model Response"), gr.JSON(label="Updated History")],
     title="Google Generative AI Chat Model",
-    description="Enter a task description to interact with the Google AI model."
+    description="Enter a task description to interact with the Google AI model. If more details are needed, the AI will clearly ask for them."
 )
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 7860))  # Ensuring the port is an integer
+    port = int(os.environ.get("PORT", 7860))
     iface.launch(server_name="0.0.0.0", server_port=port, share=True)
